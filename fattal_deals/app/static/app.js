@@ -323,8 +323,22 @@ async function cancelRun() {
   } catch { toast('Failed to cancel', 'error'); }
 }
 
+let _clearPending = false;
+let _clearTimer = null;
 async function clearAllDeals() {
-  if (!confirm('Delete all saved deals?')) return;
+  const btn = document.querySelector('.btn-xs-danger[onclick="clearAllDeals()"]');
+  if (!_clearPending) {
+    _clearPending = true;
+    if (btn) { btn.textContent = 'Sure? Click again'; btn.style.background = 'rgba(248,113,113,0.15)'; }
+    _clearTimer = setTimeout(() => {
+      _clearPending = false;
+      if (btn) { btn.textContent = 'Clear all'; btn.style.background = ''; }
+    }, 3000);
+    return;
+  }
+  clearTimeout(_clearTimer);
+  _clearPending = false;
+  if (btn) { btn.textContent = 'Clear all'; btn.style.background = ''; }
   try {
     await del(api('/api/deals'));
     toast('All deals cleared.', 'success');

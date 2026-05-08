@@ -92,6 +92,15 @@ def is_deal(price: float, nights: int, config: dict) -> bool:
 async def run_price_check():
     global _running_task
     _running_task = asyncio.current_task()
+    try:
+        await _do_price_check()
+    except asyncio.CancelledError:
+        log("Check cancelled by user", "warn")
+    finally:
+        _running_task = None
+
+
+async def _do_price_check():
     config = load_config()
     config["last_run"] = datetime.now().isoformat()
     save_config(config)
@@ -169,7 +178,6 @@ async def run_price_check():
         current_date += timedelta(days=1)
         await asyncio.sleep(0.3)
 
-    _running_task = None
     log(f"Check complete — {len(deals_found)} deal(s) saved")
 
     if deals_found and config.get("notify_device"):
