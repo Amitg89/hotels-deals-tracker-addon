@@ -17,13 +17,18 @@ async def get_ha_notify_services():
             )
             if resp.status_code != 200:
                 return []
-            return [
-                {"id": f"{s['domain']}.{s['service']}", "name": f"{s['domain']}.{s['service']}"}
-                for s in resp.json()
-                if s.get("domain") == "notify" and "mobile_app" in s.get("service", "")
-            ]
-    except Exception:
-        return []
+            # HA returns [{domain, services: {service_name: {...}}}]
+            result = []
+            for domain_obj in resp.json():
+                if domain_obj.get("domain") == "notify":
+                    for svc_name in domain_obj.get("services", {}).keys():
+                        if "mobile_app" in svc_name:
+                            full = f"notify.{svc_name}"
+                            label = svc_name.replace("mobile_app_", "").replace("_", " ").title()
+                            result.append({"id": full, "name": label})
+            return result
+    except Exception as e:
+        return [{"id": "__error__", "name": f"Error: {e}"}]
 
 
 async def send_ha_notification(device: str, title: str, message: str):

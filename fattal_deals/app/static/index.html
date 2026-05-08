@@ -7,166 +7,178 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
-    <header class="header">
-      <div class="header-left">
-        <span class="logo">🏨</span>
-        <h1>Fattal Deals Tracker</h1>
-      </div>
-      <div class="header-right">
-        <div id="status-badge" class="badge badge-off">● Inactive</div>
-        <button class="btn btn-sm btn-ghost" onclick="refreshAll()" title="Refresh">↻</button>
-      </div>
-    </header>
+<div class="app">
 
-    <main class="main">
-      <div class="layout">
+  <header class="header">
+    <div class="header-left">
+      <span class="logo">🏨</span>
+      <h1>Fattal Deals Tracker</h1>
+    </div>
+    <div class="header-right">
+      <div id="status-badge" class="badge badge-off">● Inactive</div>
+      <button class="btn btn-ghost" onclick="refreshAll()" title="Refresh">↻</button>
+    </div>
+  </header>
 
-        <!-- LEFT: Config -->
-        <section class="card config-card">
-          <h2>Search Settings</h2>
+  <main class="main">
+    <div class="layout">
 
+      <!-- ── Left: Config ── -->
+      <section class="card config-card">
+        <h2>Search Settings</h2>
+
+        <div class="form-group">
+          <label>City</label>
+          <select id="city" onchange="loadHotels()">
+            <option value="eilat">Eilat</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Hotels
+            <span class="hint">— </span>
+            <span class="select-links">
+              <a href="#" onclick="selectAllHotels();return false">all</a> /
+              <a href="#" onclick="selectNoHotels();return false">none</a>
+            </span>
+          </label>
+          <div id="hotels-list" class="checkbox-group">
+            <div class="loading-text">Loading…</div>
+          </div>
+        </div>
+
+        <div class="form-row">
           <div class="form-group">
-            <label>City</label>
-            <select id="city" onchange="loadHotels()">
-              <option value="eilat">Eilat</option>
-            </select>
+            <label>Check-in From</label>
+            <input type="date" id="date-from">
           </div>
-
           <div class="form-group">
-            <label>Hotels <span class="hint">(select all you want to track)</span></label>
-            <div class="select-all-row">
-              <button class="btn btn-xs" onclick="selectAllHotels()">All</button>
-              <button class="btn btn-xs" onclick="selectNoHotels()">None</button>
-            </div>
-            <div id="hotels-list" class="checkbox-group">
-              <div class="loading-text">Loading hotels...</div>
-            </div>
+            <label>Check-in To</label>
+            <input type="date" id="date-to">
           </div>
+        </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label>Check-in From</label>
-              <input type="date" id="date-from">
-            </div>
-            <div class="form-group">
-              <label>Check-in To</label>
-              <input type="date" id="date-to">
-            </div>
+        <div class="form-group">
+          <label>Stay Duration (nights)
+            <span class="select-links">
+              <a href="#" onclick="selectAllNights();return false">all</a> /
+              <a href="#" onclick="selectNoNights();return false">none</a>
+            </span>
+          </label>
+          <div class="nights-row">
+            <label class="night-pill"><input type="checkbox" class="nights-cb" value="1"> 1</label>
+            <label class="night-pill"><input type="checkbox" class="nights-cb" value="2" checked> 2</label>
+            <label class="night-pill"><input type="checkbox" class="nights-cb" value="3" checked> 3</label>
+            <label class="night-pill"><input type="checkbox" class="nights-cb" value="4"> 4</label>
+            <label class="night-pill"><input type="checkbox" class="nights-cb" value="5"> 5</label>
           </div>
+        </div>
 
+        <div class="form-row">
           <div class="form-group">
-            <label>Stay Duration</label>
-            <div class="checkbox-row">
-              <label class="checkbox-label">
-                <input type="checkbox" id="nights-2" value="2" checked> 2 nights
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" id="nights-3" value="3" checked> 3 nights
-              </label>
+            <label>Adults</label>
+            <input type="number" id="adults" value="2" min="1" max="6">
+          </div>
+          <div class="form-group">
+            <label>Children</label>
+            <input type="number" id="children" value="0" min="0" max="4">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Deal Alert Threshold <span class="hint">(fill one, the other disables)</span></label>
+          <div class="threshold-row">
+            <div class="threshold-field">
+              <input type="number" id="threshold-stay" placeholder="e.g. 5000" step="500"
+                     oninput="onThresholdInput('stay')">
+              <span class="threshold-unit">₪ / stay</span>
+            </div>
+            <span class="threshold-or">or</span>
+            <div class="threshold-field">
+              <input type="number" id="threshold-night" placeholder="e.g. 1500" step="100"
+                     oninput="onThresholdInput('night')">
+              <span class="threshold-unit">₪ / night</span>
             </div>
           </div>
+        </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label>Adults</label>
-              <input type="number" id="adults" value="2" min="1" max="6">
+        <div class="form-group">
+          <label>Check Interval</label>
+          <select id="interval">
+            <option value="6">Every 6 hours</option>
+            <option value="12" selected>Every 12 hours</option>
+            <option value="24">Every 24 hours</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Push Notification Device</label>
+          <select id="notify-device">
+            <option value="">Loading HA devices…</option>
+          </select>
+        </div>
+
+        <div class="actions">
+          <button id="btn-start"   class="btn btn-primary"   onclick="startJob()">▶ Start</button>
+          <button id="btn-stop"    class="btn btn-danger"    onclick="stopJob()" disabled>⏹ Stop</button>
+          <button id="btn-run-now" class="btn btn-secondary" onclick="runNow()">⚡ Run Now</button>
+        </div>
+      </section>
+
+      <!-- ── Right: Status + Tabs ── -->
+      <div class="right-col">
+
+        <section class="card status-card">
+          <h2>Status</h2>
+          <div class="stat-grid">
+            <div class="stat">
+              <div class="stat-label">State</div>
+              <div id="status-text" class="stat-value muted">Inactive</div>
             </div>
-            <div class="form-group">
-              <label>Children</label>
-              <input type="number" id="children" value="0" min="0" max="4">
+            <div class="stat">
+              <div class="stat-label">Last run</div>
+              <div id="last-run" class="stat-value muted">—</div>
             </div>
-          </div>
-
-          <div class="form-group">
-            <label>Deal alert threshold <span class="hint">(₪ per stay)</span></label>
-            <input type="number" id="price-threshold" value="5000" step="500" min="500">
-          </div>
-
-          <div class="form-group">
-            <label>Check interval</label>
-            <select id="interval">
-              <option value="6">Every 6 hours</option>
-              <option value="12" selected>Every 12 hours</option>
-              <option value="24">Every 24 hours</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Push notification device</label>
-            <select id="notify-device">
-              <option value="">Loading HA devices...</option>
-            </select>
-          </div>
-
-          <div class="actions">
-            <button id="btn-start" class="btn btn-primary" onclick="startJob()">▶ Start</button>
-            <button id="btn-stop" class="btn btn-danger" onclick="stopJob()" disabled>⏹ Stop</button>
-            <button id="btn-run-now" class="btn btn-secondary" onclick="runNow()">⚡ Run Now</button>
+            <div class="stat">
+              <div class="stat-label">Next run</div>
+              <div id="next-run" class="stat-value muted">—</div>
+            </div>
           </div>
         </section>
 
-        <!-- RIGHT: Status + Deals -->
-        <div class="right-col">
-          <section class="card status-card">
-            <h2>Status</h2>
-            <div class="stat-grid">
-              <div class="stat">
-                <div class="stat-label">State</div>
-                <div id="status-text" class="stat-value">Inactive</div>
-              </div>
-              <div class="stat">
-                <div class="stat-label">Last run</div>
-                <div id="last-run" class="stat-value muted">—</div>
-              </div>
-              <div class="stat">
-                <div class="stat-label">Next run</div>
-                <div id="next-run" class="stat-value muted">—</div>
-              </div>
-            </div>
-          </section>
+        <section class="card tab-card">
+          <div class="tabs">
+            <button class="tab active" onclick="switchTab('deals', this)">
+              Deals <span id="deals-count" class="tab-badge">0</span>
+            </button>
+            <button class="tab" onclick="switchTab('logs', this)">
+              Console <span id="logs-count" class="tab-badge">0</span>
+            </button>
+          </div>
 
-          <section class="card deals-card">
-            <div class="card-header-row">
-              <h2>Deals Found</h2>
-              <span id="deals-count" class="deals-badge">0</span>
-            </div>
+          <div id="tab-deals" class="tab-content">
             <div id="deals-list" class="deals-list">
               <div class="empty-text">No deals yet. Start the tracker!</div>
             </div>
-          </section>
-        </div>
+          </div>
+
+          <div id="tab-logs" class="tab-content hidden">
+            <div class="log-toolbar">
+              <button class="btn btn-xs" onclick="clearLogs()">Clear</button>
+              <label class="checkbox-label small">
+                <input type="checkbox" id="log-autoscroll" checked> Auto-scroll
+              </label>
+            </div>
+            <div id="log-output" class="log-output"></div>
+          </div>
+        </section>
+
       </div>
+    </div>
+  </main>
+</div>
 
-      <!-- History Table -->
-      <section class="card history-card">
-        <div class="card-header-row">
-          <h2>Price History</h2>
-          <span id="history-count" class="muted small"></span>
-        </div>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Hotel</th>
-                <th>Check-in</th>
-                <th>Nights</th>
-                <th>Public Price</th>
-                <th>Club Price</th>
-                <th>Checked At</th>
-              </tr>
-            </thead>
-            <tbody id="history-body">
-              <tr><td colspan="6" class="empty-text">No history yet.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <div id="toast" class="toast hidden"></div>
-
-  <script src="app.js"></script>
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
 </body>
 </html>

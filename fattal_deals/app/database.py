@@ -14,7 +14,7 @@ def get_conn():
 def init_db():
     conn = get_conn()
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS price_history (
+        CREATE TABLE IF NOT EXISTS deals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             hotel_id TEXT NOT NULL,
             hotel_name TEXT,
@@ -23,7 +23,7 @@ def init_db():
             nights INTEGER NOT NULL,
             price REAL,
             club_price REAL,
-            available INTEGER DEFAULT 1,
+            price_per_night REAL,
             checked_at TEXT DEFAULT (datetime('now', 'localtime'))
         )
     """)
@@ -31,32 +31,23 @@ def init_db():
     conn.close()
 
 
-def save_price(hotel_id, hotel_name, check_in, check_out, nights, price, club_price, available):
+def save_deal(hotel_id, hotel_name, check_in, check_out, nights, price, club_price):
+    price_per_night = round(price / nights, 2) if nights else None
     conn = get_conn()
     conn.execute(
-        """INSERT INTO price_history
-           (hotel_id, hotel_name, check_in, check_out, nights, price, club_price, available)
+        """INSERT INTO deals
+           (hotel_id, hotel_name, check_in, check_out, nights, price, club_price, price_per_night)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (hotel_id, hotel_name, check_in, check_out, nights, price, club_price, 1 if available else 0),
+        (hotel_id, hotel_name, check_in, check_out, nights, price, club_price, price_per_night),
     )
     conn.commit()
     conn.close()
 
 
-def get_price_history(limit=200):
+def get_deals(limit=500):
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM price_history ORDER BY checked_at DESC LIMIT ?", (limit,)
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def get_deals(threshold: float):
-    conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM price_history WHERE price <= ? AND available = 1 ORDER BY price ASC",
-        (threshold,),
+        "SELECT * FROM deals ORDER BY checked_at DESC LIMIT ?", (limit,)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
