@@ -165,16 +165,19 @@ async function loadDeals() {
       container.innerHTML = '<div class="empty-text">No deals saved yet.</div>';
       return;
     }
-    container.innerHTML = deals.slice(0, 30).map(d => `
+    container.innerHTML = deals.slice(0, 30).map(d => {
+      const bbStr  = d.bb_price  ? `<span class="plan-pill bb">BB ₪${fmtPrice(d.bb_price)}</span>`  : '';
+      const hbStr  = d.hb_price  ? `<span class="plan-pill hb">HB ₪${fmtPrice(d.hb_price)}</span>`  : '';
+      const aiStr  = d.ai_price  ? `<span class="plan-pill ai">AI ₪${fmtPrice(d.ai_price)}</span>`  : '';
+      const ppn    = d.comparison_price && d.nights ? Math.round(d.comparison_price / d.nights) : null;
+      return `
       <div class="deal-item">
         <div class="deal-hotel">${escHtml(d.hotel_name || d.hotel_id)}</div>
-        <div class="deal-meta">${d.check_in} · ${d.nights} nights · ${fmtDate(d.checked_at)}</div>
-        <div class="deal-prices">
-          <span class="deal-price-stay">₪${fmtPrice(d.price)}</span>
-          <span class="deal-price-night">₪${fmtPrice(d.price_per_night)}/night</span>
-        </div>
-        <div class="deal-club">Club: ₪${fmtPrice(d.club_price)}</div>
-      </div>`).join('');
+        <div class="deal-meta">${d.check_in} → ${d.check_out} · ${d.nights} nights · ${fmtDate(d.checked_at)}</div>
+        <div class="deal-plans">${bbStr}${hbStr}${aiStr}</div>
+        ${ppn ? `<div class="deal-ppn">₪${fmtPrice(ppn)}/night (HB basis)</div>` : ''}
+      </div>`;
+    }).join('');
   } catch {}
 }
 

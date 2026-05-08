@@ -21,9 +21,10 @@ def init_db():
             check_in TEXT NOT NULL,
             check_out TEXT NOT NULL,
             nights INTEGER NOT NULL,
-            price REAL,
-            club_price REAL,
-            price_per_night REAL,
+            bb_price REAL,
+            hb_price REAL,
+            ai_price REAL,
+            comparison_price REAL,
             checked_at TEXT DEFAULT (datetime('now', 'localtime'))
         )
     """)
@@ -31,14 +32,16 @@ def init_db():
     conn.close()
 
 
-def save_deal(hotel_id, hotel_name, check_in, check_out, nights, price, club_price):
-    price_per_night = round(price / nights, 2) if nights else None
+def save_deal(hotel_id, hotel_name, check_in, check_out, nights,
+              bb_price, hb_price, ai_price, comparison_price):
     conn = get_conn()
     conn.execute(
         """INSERT INTO deals
-           (hotel_id, hotel_name, check_in, check_out, nights, price, club_price, price_per_night)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (hotel_id, hotel_name, check_in, check_out, nights, price, club_price, price_per_night),
+           (hotel_id, hotel_name, check_in, check_out, nights,
+            bb_price, hb_price, ai_price, comparison_price)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (hotel_id, hotel_name, check_in, check_out, nights,
+         bb_price, hb_price, ai_price, comparison_price),
     )
     conn.commit()
     conn.close()
@@ -47,7 +50,8 @@ def save_deal(hotel_id, hotel_name, check_in, check_out, nights, price, club_pri
 def get_deals(limit=500):
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM deals ORDER BY checked_at DESC LIMIT ?", (limit,)
+        "SELECT * FROM deals ORDER BY checked_at DESC, comparison_price ASC LIMIT ?",
+        (limit,)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]

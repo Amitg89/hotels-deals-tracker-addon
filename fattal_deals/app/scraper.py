@@ -1,5 +1,6 @@
+import re
 import httpx
-from typing import List
+from typing import List, Optional
 
 GRAPHQL_URL = "https://be-new.fattal.co.il/graphql"
 CMS_URL = "https://cms.fattal.co.il/graphql"
@@ -10,11 +11,18 @@ query Search($searchInput: SearchInput!) {
     hotelID
     fromDate
     toDate
-    minTotalPrice
-    minTotalBasePrice
-    clubMinTotalPrice
     available
     availabilityMessage
+    roomSelections {
+      roomCategories {
+        roomCategory
+        rooms {
+          planCode
+          totalPrice
+          clubTotalPrice
+        }
+      }
+    }
   }
 }
 """
@@ -46,12 +54,62 @@ CITIES = {
     }
 }
 
+# Room category pattern that marks accessible/disabled rooms — always skip
+DISABLED_CAT = re.compile(r'HandD', re.IGNORECASE)
+
+BB_PLANS = {"B/B", "BBF"}
+HB_PLANS = {"H/B", "HBF"}
+AI_PLANS = {"ALL", "All Incl."}
+
+
+def extract_prices(hotel: dict) -> Optional[dict]:
+    """
+    Parse roomSelections and return the cheapest BB, HB, and AI prices,
+    ignoring disabled/accessibility room categories.
+
+    Comparison price for threshold = cheapest HB if available, else cheapest AI.
+    Returns None if the hotel has no available rooms at all.
+    """
+    bb_prices, hb_prices, ai_prices = [], [], []
+
+    for selection in hotel.get("roomSelections", []):
+        for cat in selection.get("roomCategories", []):
+            if DISABLED_CAT.search(cat.get("roomCategory", "")):
+                continue
+            for room in cat.get("rooms", []):
+                plan = room.get("planCode", "")
+                price = room.get("totalPrice")
+                if price is None or price <= 0:
+                    continue
+                if plan in BB_PLANS:
+                    bb_prices.append(price)
+                elif plan in HB_PLANS:
+                    hb_prices.append(price)
+                elif plan in AI_PLANS:
+                    ai_prices.append(price)
+
+    bb_min = min(bb_prices) if bb_prices else None
+    hb_min = min(hb_prices) if hb_prices else None
+    ai_min = min(ai_prices) if ai_prices else None
+
+    # Nothing at all — skip
+    if bb_min is None and hb_min is None and ai_min is None:
+        return None
+
+    # Threshold comparison: HB preferred, fall back to AI for pure-AI hotels
+    comparison_price = hb_min if hb_min is not None else ai_min
+
+    return {
+        "bb_price": bb_min,
+        "hb_price": hb_min,
+        "ai_price": ai_min,
+        "comparison_price": comparison_price,
+    }
+
 
 async def get_hotels_by_city(city: str) -> List[dict]:
     if city in CITIES:
         return CITIES[city]["hotels"]
-
-    # Fetch from CMS for unknown cities
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(

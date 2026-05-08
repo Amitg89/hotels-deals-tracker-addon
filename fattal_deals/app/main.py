@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from database import get_deals, init_db, save_deal
 from notifier import get_ha_notify_services, send_ha_notification
-from scraper import CITIES, get_hotels_by_city, search_prices
+from scraper import CITIES, extract_prices, get_hotels_by_city, search_prices
 
 DATA_DIR = Path("/data")
 CONFIG_FILE = DATA_DIR / "config.json"
@@ -125,25 +125,40 @@ async def run_price_check():
                 log(f"  {len(available)}/{len(results)} hotels available")
 
                 for hotel in available:
-                    price = hotel["minTotalPrice"]
-                    club = hotel["clubMinTotalPrice"]
                     name = hotel.get("hotelName", hotel["hotelID"])
-                    ppn = round(price / nights)
+                    prices = extract_prices(hotel)
 
-                    if is_deal(price, nights, config):
-                        log(f"  ✓ DEAL  {name}  ₪{price:,.0f}  (₪{ppn}/night)", "deal")
+                    if prices is None:
+                        log(f"  · {name} — no valid rooms after filtering")
+                        continue
+
+                    cp = prices["comparison_price"]
+                    if cp is None:
+                        log(f"  · {name} — no HB or AI price available")
+                        continue
+
+                    ppn = round(cp / nights)
+                    bb_str = f"BB ₪{prices['bb_price']:,.0f}" if prices["bb_price"] else ""
+                    hb_str = f"HB ₪{prices['hb_price']:,.0f}" if prices["hb_price"] else ""
+                    ai_str = f"AI ₪{prices['ai_price']:,.0f}" if prices["ai_price"] else ""
+                    plan_summary = "  ".join(filter(None, [bb_str, hb_str, ai_str]))
+
+                    if is_deal(cp, nights, config):
+                        log(f"  ✓ DEAL  {name}  {plan_summary}  (₪{ppn}/night HB)", "deal")
                         save_deal(
                             hotel_id=hotel["hotelID"],
                             hotel_name=name,
                             check_in=hotel["fromDate"],
                             check_out=hotel["toDate"],
                             nights=nights,
-                            price=price,
-                            club_price=club,
+                            bb_price=prices["bb_price"],
+                            hb_price=prices["hb_price"],
+                            ai_price=prices["ai_price"],
+                            comparison_price=cp,
                         )
-                        deals_found.append({**hotel, "nights": nights})
+                        deals_found.append({**hotel, "nights": nights, "prices": prices})
                     else:
-                        log(f"  · {name}  ₪{price:,.0f}  (₪{ppn}/night) — above threshold")
+                        log(f"  · {name}  {plan_summary}  (₪{ppn}/night HB) — above threshold")
 
             except Exception as e:
                 log(f"  Error: {e}", "error")
@@ -154,10 +169,11 @@ async def run_price_check():
     log(f"Check complete — {len(deals_found)} deal(s) saved")
 
     if deals_found and config.get("notify_device"):
-        lines = [
-            f"• {d.get('hotelName', d['hotelID'])}: ₪{d['minTotalPrice']:,.0f} ({d['fromDate']}, {d['nights']}n)"
-            for d in deals_found[:5]
-        ]
+        lines = []
+        for d in deals_found[:5]:
+            p = d.get("prices", {})
+            price_str = f"HB ₪{p['hb_price']:,.0f}" if p.get("hb_price") else f"AI ₪{p['ai_price']:,.0f}"
+            lines.append(f"• {d.get('hotelName', d['hotelID'])}: {price_str} ({d['fromDate']}, {d['nights']}n)")
         ok = await send_ha_notification(
             device=config["notify_device"],
             title=f"🏨 {len(deals_found)} Fattal deal{'s' if len(deals_found) > 1 else ''} found!",
