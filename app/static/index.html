@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fattal Deals Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">🏨</span>
+        <h1>Fattal Deals Tracker</h1>
+      </div>
+      <div class="header-right">
+        <div id="status-badge" class="badge badge-off">● Inactive</div>
+        <button class="btn btn-sm btn-ghost" onclick="refreshAll()" title="Refresh">↻</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="layout">
+
+        <!-- LEFT: Config -->
+        <section class="card config-card">
+          <h2>Search Settings</h2>
+
+          <div class="form-group">
+            <label>City</label>
+            <select id="city" onchange="loadHotels()">
+              <option value="eilat">Eilat</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Hotels <span class="hint">(select all you want to track)</span></label>
+            <div class="select-all-row">
+              <button class="btn btn-xs" onclick="selectAllHotels()">All</button>
+              <button class="btn btn-xs" onclick="selectNoHotels()">None</button>
+            </div>
+            <div id="hotels-list" class="checkbox-group">
+              <div class="loading-text">Loading hotels...</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Check-in From</label>
+              <input type="date" id="date-from">
+            </div>
+            <div class="form-group">
+              <label>Check-in To</label>
+              <input type="date" id="date-to">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Stay Duration</label>
+            <div class="checkbox-row">
+              <label class="checkbox-label">
+                <input type="checkbox" id="nights-2" value="2" checked> 2 nights
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="nights-3" value="3" checked> 3 nights
+              </label>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Adults</label>
+              <input type="number" id="adults" value="2" min="1" max="6">
+            </div>
+            <div class="form-group">
+              <label>Children</label>
+              <input type="number" id="children" value="0" min="0" max="4">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Deal alert threshold <span class="hint">(₪ per stay)</span></label>
+            <input type="number" id="price-threshold" value="5000" step="500" min="500">
+          </div>
+
+          <div class="form-group">
+            <label>Check interval</label>
+            <select id="interval">
+              <option value="6">Every 6 hours</option>
+              <option value="12" selected>Every 12 hours</option>
+              <option value="24">Every 24 hours</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Push notification device</label>
+            <select id="notify-device">
+              <option value="">Loading HA devices...</option>
+            </select>
+          </div>
+
+          <div class="actions">
+            <button id="btn-start" class="btn btn-primary" onclick="startJob()">▶ Start</button>
+            <button id="btn-stop" class="btn btn-danger" onclick="stopJob()" disabled>⏹ Stop</button>
+            <button id="btn-run-now" class="btn btn-secondary" onclick="runNow()">⚡ Run Now</button>
+          </div>
+        </section>
+
+        <!-- RIGHT: Status + Deals -->
+        <div class="right-col">
+          <section class="card status-card">
+            <h2>Status</h2>
+            <div class="stat-grid">
+              <div class="stat">
+                <div class="stat-label">State</div>
+                <div id="status-text" class="stat-value">Inactive</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Last run</div>
+                <div id="last-run" class="stat-value muted">—</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Next run</div>
+                <div id="next-run" class="stat-value muted">—</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card deals-card">
+            <div class="card-header-row">
+              <h2>Deals Found</h2>
+              <span id="deals-count" class="deals-badge">0</span>
+            </div>
+            <div id="deals-list" class="deals-list">
+              <div class="empty-text">No deals yet. Start the tracker!</div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- History Table -->
+      <section class="card history-card">
+        <div class="card-header-row">
+          <h2>Price History</h2>
+          <span id="history-count" class="muted small"></span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Hotel</th>
+                <th>Check-in</th>
+                <th>Nights</th>
+                <th>Public Price</th>
+                <th>Club Price</th>
+                <th>Checked At</th>
+              </tr>
+            </thead>
+            <tbody id="history-body">
+              <tr><td colspan="6" class="empty-text">No history yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
