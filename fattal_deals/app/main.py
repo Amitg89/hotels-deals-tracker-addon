@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from database import get_deals, init_db, save_deal
+from database import clear_deals, delete_deal, get_deals, init_db, save_deal
 from notifier import get_ha_notify_services, send_ha_notification
 from scraper import extract_prices, get_all_cities_with_hotels, search_prices
 
@@ -79,6 +79,7 @@ def save_config(config: dict):
 # ── Price check ───────────────────────────────────────────────────────────────
 
 scheduler = AsyncIOScheduler(timezone="Asia/Jerusalem")
+_running_task: Optional[asyncio.Task] = None
 
 
 def is_deal(price: float, nights: int, config: dict) -> bool:
@@ -89,6 +90,8 @@ def is_deal(price: float, nights: int, config: dict) -> bool:
 
 
 async def run_price_check():
+    global _running_task
+    _running_task = asyncio.current_task()
     config = load_config()
     config["last_run"] = datetime.now().isoformat()
     save_config(config)
@@ -166,6 +169,7 @@ async def run_price_check():
         current_date += timedelta(days=1)
         await asyncio.sleep(0.3)
 
+    _running_task = None
     log(f"Check complete — {len(deals_found)} deal(s) saved")
 
     if deals_found and config.get("notify_device"):
@@ -218,6 +222,7 @@ async def get_status():
         "active": config.get("active", False),
         "last_run": config.get("last_run"),
         "next_run": job.next_run_time.isoformat() if job and job.next_run_time else None,
+        "run_in_progress": _running_task is not None and not _running_task.done(),
     }
 
 
@@ -281,9 +286,32 @@ async def run_now():
     return {"status": "triggered"}
 
 
+@app.post("/api/jobs/cancel-run")
+async def cancel_run():
+    global _running_task
+    if _running_task and not _running_task.done():
+        _running_task.cancel()
+        _running_task = None
+        log("Manual check cancelled by user", "warn")
+        return {"status": "cancelled"}
+    return {"status": "not_running"}
+
+
 @app.get("/api/deals")
 async def list_deals(limit: int = 500):
     return get_deals(limit)
+
+
+@app.delete("/api/deals")
+async def clear_all_deals():
+    clear_deals()
+    return {"status": "ok"}
+
+
+@app.delete("/api/deals/{deal_id}")
+async def remove_deal(deal_id: int):
+    delete_deal(deal_id)
+    return {"status": "ok"}
 
 
 @app.get("/api/logs")

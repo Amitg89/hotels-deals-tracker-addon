@@ -67,3 +67,17 @@ def get_deals(limit=500):
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def delete_deal(deal_id: int):
+    conn = get_conn()
+    conn.execute("DELETE FROM deals WHERE id = ?", (deal_id,))
+    conn.commit()
+    conn.close()
+
+
+def clear_deals():
+    conn = get_conn()
+    conn.execute("DELETE FROM deals")
+    conn.commit()
+    conn.close()

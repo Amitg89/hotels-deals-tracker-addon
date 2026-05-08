@@ -4,6 +4,10 @@ const api = (path) => `${BASE}${path}`;
 let evtSource = null;
 let logCount = 0;
 
+const FAVORITES_KEY = 'fattal_favorites';
+function getFavorites() { try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')); } catch { return new Set(); } }
+function saveFavorites(s) { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...s])); }
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -78,7 +82,7 @@ async function loadCitiesWithHotels() {
 function buildCityGroup(city) {
   const hotelRows = city.hotels.map(h => `
     <label>
-      <input type="checkbox" class="hotel-cb" data-city="${city.slug}" value="${h.id}" checked
+      <input type="checkbox" class="hotel-cb" data-city="${city.slug}" value="${h.id}"
              onchange="onHotelCbChange('${city.slug}')">
       ${escHtml(h.name)}
     </label>`).join('');
@@ -87,14 +91,14 @@ function buildCityGroup(city) {
   <div class="city-group">
     <div class="city-row">
       <input type="checkbox" class="city-cb" id="city-cb-${city.slug}"
-             data-city="${city.slug}" checked
+             data-city="${city.slug}"
              onchange="onCityCbChange('${city.slug}')">
-      <span class="city-toggle" onclick="toggleCity('${city.slug}')">▼</span>
+      <span class="city-toggle" onclick="toggleCity('${city.slug}')">▶</span>
       <label class="city-label" for="city-cb-${city.slug}">
         ${escHtml(city.name)} <span class="city-count">(${city.hotels.length})</span>
       </label>
     </div>
-    <div class="city-hotels" id="city-hotels-${city.slug}">
+    <div class="city-hotels collapsed" id="city-hotels-${city.slug}">
       ${hotelRows}
     </div>
   </div>`;
@@ -109,6 +113,12 @@ function toggleCity(slug) {
 
 function onCityCbChange(slug) {
   const cityCb = document.getElementById(`city-cb-${slug}`);
+  // Expand city when checking it
+  if (cityCb.checked) {
+    const el = document.getElementById(`city-hotels-${slug}`);
+    el.classList.remove('collapsed');
+    el.previousElementSibling.querySelector('.city-toggle').textContent = '▼';
+  }
   document.querySelectorAll(`.hotel-cb[data-city="${slug}"]`).forEach(cb => {
     cb.checked = cityCb.checked;
   });
@@ -134,6 +144,11 @@ function onHotelCbChange(slug) {
 function selectAllHotels() {
   document.querySelectorAll('.hotel-cb').forEach(cb => cb.checked = true);
   document.querySelectorAll('.city-cb').forEach(cb => { cb.checked = true; cb.indeterminate = false; });
+  // Expand all
+  document.querySelectorAll('.city-hotels').forEach(el => {
+    el.classList.remove('collapsed');
+    el.previousElementSibling.querySelector('.city-toggle').textContent = '▼';
+  });
 }
 
 function selectNoHotels() {
@@ -189,9 +204,19 @@ async function loadConfig() {
         document.querySelectorAll('.hotel-cb').forEach(cb => {
           cb.checked = cfg.hotels.includes(cb.value);
         });
-        // Update city indeterminate states
+        // Expand cities that have at least one hotel checked
         const slugs = new Set([...document.querySelectorAll('.city-cb')].map(cb => cb.dataset.city));
-        slugs.forEach(slug => onHotelCbChange(slug));
+        slugs.forEach(slug => {
+          onHotelCbChange(slug);
+          const hasChecked = [...document.querySelectorAll(`.hotel-cb[data-city="${slug}"]`)].some(cb => cb.checked);
+          if (hasChecked) {
+            const el = document.getElementById(`city-hotels-${slug}`);
+            if (el) {
+              el.classList.remove('collapsed');
+              el.previousElementSibling.querySelector('.city-toggle').textContent = '▼';
+            }
+          }
+        });
       }, 600);
     }
 
@@ -218,6 +243,9 @@ async function loadStatus() {
     document.getElementById('next-run').textContent = s.next_run ? fmtDate(s.next_run) : '—';
     document.getElementById('btn-start').disabled = active;
     document.getElementById('btn-stop').disabled  = !active;
+    // Cancel-run button visibility
+    const cancelBtn = document.getElementById('btn-cancel-run');
+    cancelBtn.style.display = s.run_in_progress ? '' : 'none';
   } catch {}
 }
 
@@ -230,13 +258,19 @@ async function loadDeals() {
       container.innerHTML = '<div class="empty-text">No deals saved yet.</div>';
       return;
     }
-    container.innerHTML = deals.slice(0, 30).map(d => {
-      const bbStr  = d.bb_price  ? `<span class="plan-pill bb">BB ₪${fmtPrice(d.bb_price)}</span>`  : '';
-      const hbStr  = d.hb_price  ? `<span class="plan-pill hb">HB ₪${fmtPrice(d.hb_price)}</span>`  : '';
-      const aiStr  = d.ai_price  ? `<span class="plan-pill ai">AI ₪${fmtPrice(d.ai_price)}</span>`  : '';
-      const ppn    = d.comparison_price && d.nights ? Math.round(d.comparison_price / d.nights) : null;
+    const favs = getFavorites();
+    container.innerHTML = deals.slice(0, 100).map(d => {
+      const isFav = favs.has(String(d.id));
+      const bbStr = d.bb_price  ? `<span class="plan-pill bb">BB ₪${fmtPrice(d.bb_price)}</span>`  : '';
+      const hbStr = d.hb_price  ? `<span class="plan-pill hb">HB ₪${fmtPrice(d.hb_price)}</span>`  : '';
+      const aiStr = d.ai_price  ? `<span class="plan-pill ai">AI ₪${fmtPrice(d.ai_price)}</span>`  : '';
+      const ppn   = d.comparison_price && d.nights ? Math.round(d.comparison_price / d.nights) : null;
       return `
-      <div class="deal-item">
+      <div class="deal-item${isFav ? ' starred' : ''}" data-id="${d.id}">
+        <div class="deal-row-actions">
+          <button class="deal-star" onclick="toggleFavorite('${d.id}', this)" title="Favourite">${isFav ? '★' : '☆'}</button>
+          <button class="deal-delete" onclick="deleteDeal(${d.id})" title="Delete">✕</button>
+        </div>
         <div class="deal-hotel">${escHtml(d.hotel_name || d.hotel_id)}</div>
         <div class="deal-meta">${d.check_in} → ${d.check_out} · ${d.nights} nights · ${fmtDate(d.checked_at)}</div>
         <div class="deal-plans">${bbStr}${hbStr}${aiStr}</div>
@@ -274,9 +308,54 @@ async function runNow() {
   try {
     await post(api('/api/config'), cfg);
     await post(api('/api/jobs/run-now'), {});
+    // Show cancel button immediately
+    document.getElementById('btn-cancel-run').style.display = '';
     switchTab('logs', document.querySelectorAll('.tab')[1]);
     toast('Check triggered — watch the console!', 'success');
   } catch { toast('Failed to trigger run', 'error'); }
+}
+
+async function cancelRun() {
+  try {
+    await post(api('/api/jobs/cancel-run'), {});
+    document.getElementById('btn-cancel-run').style.display = 'none';
+    toast('Run cancelled.', 'success');
+  } catch { toast('Failed to cancel', 'error'); }
+}
+
+async function clearAllDeals() {
+  if (!confirm('Delete all saved deals?')) return;
+  try {
+    await del(api('/api/deals'));
+    toast('All deals cleared.', 'success');
+    await loadDeals();
+  } catch { toast('Failed to clear deals', 'error'); }
+}
+
+async function deleteDeal(id) {
+  try {
+    await del(api(`/api/deals/${id}`));
+    const el = document.querySelector(`.deal-item[data-id="${id}"]`);
+    if (el) el.remove();
+    const remaining = document.querySelectorAll('.deal-item').length;
+    document.getElementById('deals-count').textContent = remaining;
+    if (!remaining) document.getElementById('deals-list').innerHTML = '<div class="empty-text">No deals saved yet.</div>';
+  } catch { toast('Failed to delete deal', 'error'); }
+}
+
+function toggleFavorite(id, btn) {
+  const favs = getFavorites();
+  const item = btn.closest('.deal-item');
+  if (favs.has(String(id))) {
+    favs.delete(String(id));
+    btn.textContent = '☆';
+    item.classList.remove('starred');
+  } else {
+    favs.add(String(id));
+    btn.textContent = '★';
+    item.classList.add('starred');
+  }
+  saveFavorites(favs);
 }
 
 // ── Threshold mutual-disable ──────────────────────────────────────────────────
@@ -328,6 +407,12 @@ async function get(url) {
 
 async function post(url, data) {
   const r = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+  if (!r.ok) throw new Error(r.statusText);
+  return r.json();
+}
+
+async function del(url) {
+  const r = await fetch(url, { method: 'DELETE' });
   if (!r.ok) throw new Error(r.statusText);
   return r.json();
 }

@@ -149,6 +149,9 @@
           </div>
 
           <div id="tab-deals" class="tab-content">
+            <div class="log-toolbar">
+              <button class="btn btn-xs btn-xs-danger" onclick="clearAllDeals()">Clear all</button>
+            </div>
             <div id="deals-list" class="deals-list">
               <div class="empty-text">No deals yet. Start the tracker!</div>
             </div>
@@ -157,6 +160,7 @@
           <div id="tab-logs" class="tab-content hidden">
             <div class="log-toolbar">
               <button class="btn btn-xs" onclick="clearLogs()">Clear</button>
+              <button id="btn-cancel-run" class="btn btn-xs btn-xs-danger" onclick="cancelRun()" style="display:none">⏹ Cancel run</button>
               <label class="checkbox-label small">
                 <input type="checkbox" id="log-autoscroll" checked> Auto-scroll
               </label>
