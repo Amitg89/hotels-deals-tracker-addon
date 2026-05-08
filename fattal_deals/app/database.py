@@ -28,6 +28,18 @@ def init_db():
             checked_at TEXT DEFAULT (datetime('now', 'localtime'))
         )
     """)
+    # Migrate old schema: add missing columns if they don't exist
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(deals)")}
+    for col, typedef in [
+        ("bb_price", "REAL"),
+        ("hb_price", "REAL"),
+        ("ai_price", "REAL"),
+        ("comparison_price", "REAL"),
+    ]:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE deals ADD COLUMN {col} {typedef}")
+    # Drop old columns that no longer exist in code (price, club_price, price_per_night, available)
+    # SQLite doesn't support DROP COLUMN before v3.35 so we just leave them harmlessly
     conn.commit()
     conn.close()
 
