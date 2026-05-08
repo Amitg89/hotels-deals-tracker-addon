@@ -130,6 +130,19 @@ input[type="checkbox"] { accent-color: var(--accent); width: 13px; height: 13px;
 .plan-pill.ai { background: rgba(52,211,153,0.15); color: var(--green); }
 .deal-ppn { font-size: 0.73rem; color: var(--text-muted); }
 
+/* Hotel tree */
+.hotels-tree { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 0.45rem; max-height: 260px; overflow-y: auto; }
+.city-group { margin-bottom: 0.1rem; }
+.city-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.22rem 0.3rem; border-radius: 4px; }
+.city-row:hover { background: rgba(255,255,255,0.04); }
+.city-toggle { cursor: pointer; font-size: 0.6rem; color: var(--text-muted); width: 12px; flex-shrink: 0; user-select: none; }
+.city-label { font-size: 0.82rem; font-weight: 600; color: var(--text); cursor: pointer; flex: 1; margin-bottom: 0; }
+.city-count { font-weight: 400; color: var(--text-muted); font-size: 0.72rem; }
+.city-hotels { padding-left: 1.5rem; }
+.city-hotels.collapsed { display: none; }
+.city-hotels label { display: flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.3rem; border-radius: 4px; cursor: pointer; font-size: 0.78rem; color: var(--text); margin-bottom: 0; }
+.city-hotels label:hover { background: rgba(255,255,255,0.04); }
+
 /* Console / logs */
 .log-toolbar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
 .log-output { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.72rem; line-height: 1.6; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.75rem; height: 340px; overflow-y: auto; }

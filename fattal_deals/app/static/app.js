@@ -7,7 +7,7 @@ let logCount = 0;
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 async function init() {
-  await Promise.all([loadHotels(), loadDevices(), loadConfig()]);
+  await Promise.all([loadCitiesWithHotels(), loadDevices(), loadConfig()]);
   await refreshAll();
   connectLogStream();
   setInterval(refreshAll, 30000);
@@ -26,7 +26,6 @@ function connectLogStream() {
     try { appendLog(JSON.parse(e.data)); } catch {}
   };
   evtSource.onerror = () => {
-    // Reconnect after 5s
     setTimeout(connectLogStream, 5000);
   };
 }
@@ -59,23 +58,90 @@ function switchTab(name, btn) {
   document.getElementById(`tab-${name}`).classList.remove('hidden');
 }
 
-// ── Data Loaders ──────────────────────────────────────────────────────────────
+// ── Hotel tree ────────────────────────────────────────────────────────────────
 
-async function loadHotels() {
-  const city = document.getElementById('city').value;
-  const container = document.getElementById('hotels-list');
+async function loadCitiesWithHotels() {
+  const container = document.getElementById('hotels-tree');
   container.innerHTML = '<div class="loading-text">Loading…</div>';
   try {
-    const hotels = await get(api(`/api/hotels?city=${city}`));
-    container.innerHTML = hotels.map(h => `
-      <label>
-        <input type="checkbox" class="hotel-cb" value="${h.id}" checked>
-        ${escHtml(h.name)}
-      </label>`).join('') || '<div class="loading-text">No hotels found.</div>';
+    const cities = await get(api('/api/cities-with-hotels'));
+    if (!cities.length) {
+      container.innerHTML = '<div class="loading-text">No hotels found.</div>';
+      return;
+    }
+    container.innerHTML = cities.map(city => buildCityGroup(city)).join('');
   } catch {
     container.innerHTML = '<div class="loading-text">Failed to load hotels.</div>';
   }
 }
+
+function buildCityGroup(city) {
+  const hotelRows = city.hotels.map(h => `
+    <label>
+      <input type="checkbox" class="hotel-cb" data-city="${city.slug}" value="${h.id}" checked
+             onchange="onHotelCbChange('${city.slug}')">
+      ${escHtml(h.name)}
+    </label>`).join('');
+
+  return `
+  <div class="city-group">
+    <div class="city-row">
+      <input type="checkbox" class="city-cb" id="city-cb-${city.slug}"
+             data-city="${city.slug}" checked
+             onchange="onCityCbChange('${city.slug}')">
+      <span class="city-toggle" onclick="toggleCity('${city.slug}')">▼</span>
+      <label class="city-label" for="city-cb-${city.slug}">
+        ${escHtml(city.name)} <span class="city-count">(${city.hotels.length})</span>
+      </label>
+    </div>
+    <div class="city-hotels" id="city-hotels-${city.slug}">
+      ${hotelRows}
+    </div>
+  </div>`;
+}
+
+function toggleCity(slug) {
+  const el = document.getElementById(`city-hotels-${slug}`);
+  const toggle = el.previousElementSibling.querySelector('.city-toggle');
+  el.classList.toggle('collapsed');
+  toggle.textContent = el.classList.contains('collapsed') ? '▶' : '▼';
+}
+
+function onCityCbChange(slug) {
+  const cityCb = document.getElementById(`city-cb-${slug}`);
+  document.querySelectorAll(`.hotel-cb[data-city="${slug}"]`).forEach(cb => {
+    cb.checked = cityCb.checked;
+  });
+  cityCb.indeterminate = false;
+}
+
+function onHotelCbChange(slug) {
+  const hotelCbs = [...document.querySelectorAll(`.hotel-cb[data-city="${slug}"]`)];
+  const checkedCount = hotelCbs.filter(cb => cb.checked).length;
+  const cityCb = document.getElementById(`city-cb-${slug}`);
+  if (checkedCount === 0) {
+    cityCb.checked = false;
+    cityCb.indeterminate = false;
+  } else if (checkedCount === hotelCbs.length) {
+    cityCb.checked = true;
+    cityCb.indeterminate = false;
+  } else {
+    cityCb.checked = false;
+    cityCb.indeterminate = true;
+  }
+}
+
+function selectAllHotels() {
+  document.querySelectorAll('.hotel-cb').forEach(cb => cb.checked = true);
+  document.querySelectorAll('.city-cb').forEach(cb => { cb.checked = true; cb.indeterminate = false; });
+}
+
+function selectNoHotels() {
+  document.querySelectorAll('.hotel-cb').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.city-cb').forEach(cb => { cb.checked = false; cb.indeterminate = false; });
+}
+
+// ── Data Loaders ──────────────────────────────────────────────────────────────
 
 async function loadDevices() {
   const sel = document.getElementById('notify-device');
@@ -95,14 +161,12 @@ async function loadDevices() {
 async function loadConfig() {
   try {
     const cfg = await get(api('/api/config'));
-    if (cfg.city) document.getElementById('city').value = cfg.city;
     if (cfg.date_from) document.getElementById('date-from').value = cfg.date_from;
     if (cfg.date_to)   document.getElementById('date-to').value   = cfg.date_to;
     if (cfg.adults !== undefined)   document.getElementById('adults').value   = cfg.adults;
     if (cfg.children !== undefined) document.getElementById('children').value = cfg.children;
     if (cfg.interval_hours) document.getElementById('interval').value = cfg.interval_hours;
 
-    // Threshold
     if (cfg.price_threshold) {
       if (cfg.threshold_type === 'night') {
         document.getElementById('threshold-night').value = cfg.price_threshold;
@@ -113,23 +177,24 @@ async function loadConfig() {
       }
     }
 
-    // Nights
     if (cfg.nights) {
       document.querySelectorAll('.nights-cb').forEach(cb => {
         cb.checked = cfg.nights.includes(Number(cb.value));
       });
     }
 
-    // Hotels (after DOM is ready)
+    // Restore hotel selection after tree is rendered
     if (cfg.hotels?.length) {
       setTimeout(() => {
         document.querySelectorAll('.hotel-cb').forEach(cb => {
           cb.checked = cfg.hotels.includes(cb.value);
         });
-      }, 400);
+        // Update city indeterminate states
+        const slugs = new Set([...document.querySelectorAll('.city-cb')].map(cb => cb.dataset.city));
+        slugs.forEach(slug => onHotelCbChange(slug));
+      }, 600);
     }
 
-    // Device
     if (cfg.notify_device) {
       setTimeout(() => {
         const sel = document.getElementById('notify-device');
@@ -185,10 +250,10 @@ async function loadDeals() {
 
 async function startJob() {
   const cfg = collectConfig();
-  if (!cfg.hotels.length)         { toast('Select at least one hotel', 'error'); return; }
-  if (!cfg.date_from || !cfg.date_to) { toast('Set a date range', 'error'); return; }
-  if (!cfg.price_threshold)       { toast('Set a price threshold', 'error'); return; }
-  if (!cfg.nights.length)         { toast('Select at least one night duration', 'error'); return; }
+  if (!cfg.hotels.length)              { toast('Select at least one hotel', 'error'); return; }
+  if (!cfg.date_from || !cfg.date_to)  { toast('Set a date range', 'error'); return; }
+  if (!cfg.price_threshold)            { toast('Set a price threshold', 'error'); return; }
+  if (!cfg.nights.length)              { toast('Select at least one night duration', 'error'); return; }
   try {
     await post(api('/api/jobs/start'), cfg);
     toast('Tracker started!', 'success');
@@ -228,10 +293,6 @@ function onThresholdInput(type) {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function selectAllHotels()  { document.querySelectorAll('.hotel-cb').forEach(cb => cb.checked = true); }
-function selectNoHotels()   { document.querySelectorAll('.hotel-cb').forEach(cb => cb.checked = false); }
 function selectAllNights()  { document.querySelectorAll('.nights-cb').forEach(cb => cb.checked = true); }
 function selectNoNights()   { document.querySelectorAll('.nights-cb').forEach(cb => cb.checked = false); }
 
@@ -244,7 +305,6 @@ function collectConfig() {
   const priceThreshold = nightVal ? parseFloat(nightVal) : (stayVal ? parseFloat(stayVal) : null);
 
   return {
-    city: document.getElementById('city').value,
     hotels,
     date_from: document.getElementById('date-from').value,
     date_to:   document.getElementById('date-to').value,
@@ -257,6 +317,8 @@ function collectConfig() {
     notify_device: document.getElementById('notify-device').value,
   };
 }
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
 
 async function get(url) {
   const r = await fetch(url);

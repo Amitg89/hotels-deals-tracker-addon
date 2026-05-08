@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from database import get_deals, init_db, save_deal
 from notifier import get_ha_notify_services, send_ha_notification
-from scraper import CITIES, extract_prices, get_hotels_by_city, search_prices
+from scraper import extract_prices, get_all_cities_with_hotels, search_prices
 
 DATA_DIR = Path("/data")
 CONFIG_FILE = DATA_DIR / "config.json"
@@ -235,14 +235,9 @@ async def update_config(request: Request):
     return {"status": "ok"}
 
 
-@app.get("/api/cities")
-async def list_cities():
-    return [{"slug": slug, "name": info["name"]} for slug, info in CITIES.items()]
-
-
-@app.get("/api/hotels")
-async def list_hotels(city: str = "eilat"):
-    return await get_hotels_by_city(city)
+@app.get("/api/cities-with-hotels")
+async def list_cities_with_hotels():
+    return await get_all_cities_with_hotels()
 
 
 @app.get("/api/notify-devices")

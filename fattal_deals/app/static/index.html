@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fattal Deals Tracker</title>
-  <link rel="stylesheet" href="style.css?v=1.2.1">
+  <link rel="stylesheet" href="style.css?v=1.3.0">
 </head>
 <body>
 <div class="app">
@@ -28,21 +28,13 @@
         <h2>Search Settings</h2>
 
         <div class="form-group">
-          <label>City</label>
-          <select id="city" onchange="loadHotels()">
-            <option value="eilat">Eilat</option>
-          </select>
-        </div>
-
-        <div class="form-group">
           <label>Hotels
-            <span class="hint">— </span>
             <span class="select-links">
               <a href="#" onclick="selectAllHotels();return false">all</a> /
               <a href="#" onclick="selectNoHotels();return false">none</a>
             </span>
           </label>
-          <div id="hotels-list" class="checkbox-group">
+          <div id="hotels-tree" class="hotels-tree">
             <div class="loading-text">Loading…</div>
           </div>
         </div>
@@ -179,6 +171,6 @@
 </div>
 
 <div id="toast" class="toast hidden"></div>
-<script src="app.js?v=1.2.1"></script>
+<script src="app.js?v=1.3.0"></script>
 </body>
 </html>
