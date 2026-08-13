@@ -101,19 +101,50 @@ _CMS_QUERY = """
 """
 
 
+def _hotel_attributes(payload: dict) -> List[dict]:
+    """
+    Pull the hotel attribute dicts out of a CMS response.
+
+    The CMS has served two shapes: `hotels.data[]` holding bare `{attributes}` entries,
+    and `hotels[]` where every entry wraps its own `{data: {attributes}}`. Accept either,
+    because a shape change here empties the hotel picker with no other symptom.
+    """
+    hotels = (payload.get("data") or {}).get("hotels")
+    if isinstance(hotels, dict):
+        entries = hotels.get("data") or []
+    elif isinstance(hotels, list):
+        entries = hotels
+    else:
+        entries = []
+
+    attributes = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        inner = entry.get("data")
+        attrs = (inner if isinstance(inner, dict) else entry).get("attributes")
+        if isinstance(attrs, dict):
+            attributes.append(attrs)
+    return attributes
+
+
 async def get_all_cities_with_hotels() -> List[dict]:
     if _cities_cache:
         return sorted(_cities_cache.values(), key=lambda c: c["name"])
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
             resp = await client.post(CMS_URL, json={"query": _CMS_QUERY})
-            hotels_data = resp.json().get("data", {}).get("hotels", {}).get("data", [])
-    except Exception:
+        hotels_attrs = _hotel_attributes(resp.json())
+    except Exception as err:
+        print(f"[ERROR] CMS hotel list request failed: {err!r}")
+        return []
+
+    if not hotels_attrs:
+        print("[ERROR] CMS returned no hotels — the response shape may have changed")
         return []
 
     cities: dict = {}
-    for h in hotels_data:
-        attrs = h.get("attributes", {})
+    for attrs in hotels_attrs:
         pms_id = attrs.get("pmsID")
         if not pms_id:
             continue
